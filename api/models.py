@@ -1,4 +1,5 @@
 # from ckeditor_uploader.fields import RichTextUploadingField
+from ckeditor_uploader.fields import RichTextUploadingField
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from taggit.managers import TaggableManager
@@ -6,7 +7,7 @@ from taggit.managers import TaggableManager
 
 class CustomUser(AbstractUser):
     spent = models.PositiveIntegerField(default=0)
-    avatar = models.ImageField()
+    avatar = models.ImageField(default='/static/421-4212341_default-avatar-svg-hd-png-download.png')
 
     def __str__(self):
         return f'Name: {self.username} id: {self.id} spent: {self.spent}uah'
@@ -32,6 +33,7 @@ class MovieSeance(models.Model):
     image = models.ImageField(blank=True, null=True)
     slug = models.SlugField(blank=True, null=True)
     tag = TaggableManager()
+    description = RichTextUploadingField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -41,6 +43,13 @@ class MovieSeance(models.Model):
         return f'Movie: {self.movie_title} | Price: {self.price} ' \
                f'| Start seance: {self.start_time_seance} | Start date {self.show_start_date.date()}' \
                f'| image: {self.image}'
+
+    def save(self, **kwargs):
+        if not self.id:
+            self.free_seats = self.show_hall.hall_size
+        if not self.slug:
+            self.slug = '_'.join(self.movie_title.split())
+        return super().save(**kwargs)
 
 
 class Buying(models.Model):

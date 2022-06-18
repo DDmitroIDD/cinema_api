@@ -5,7 +5,7 @@ import taggit
 from django.core.mail import send_mail
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, GenericAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -17,7 +17,7 @@ from taggit.models import Tag
 
 from api.filters import MyTimeRangeAndHallFilter
 from api.serializers import CinemaHallSerializer, MovieSeanceSerializer, BuyingSerializer, \
-    CustomUserSerializer, ContactSerailizer
+    CustomUserSerializer, ContactSerailizer, TagSerializer
 from api.models import CinemaHall, MovieSeance, Buying, CustomUser
 
 
@@ -27,11 +27,21 @@ class CustomPagination(PageNumberPagination):
     max_page_size = 10
 
 
+class ProfileView(GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CustomUserSerializer
+
+    def get(self, request, *args,  **kwargs):
+        return Response({
+            "user": CustomUserSerializer(request.user, context=self.get_serializer_context()).data,
+        })
+
+
 class CustomUserViewSet(ModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
     http_method_names = ['post', ]
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
 
     def get_permissions(self):
         if self.request.method == 'POST':
@@ -50,23 +60,29 @@ class CinemaHallViewSet(ModelViewSet):
     queryset = CinemaHall.objects.all()
     serializer_class = CinemaHallSerializer
     permission_classes = [IsAdminUser]
-    pagination_class = CustomPagination
+    # pagination_class = CustomPagination
 
     def get_permissions(self):
         if self.request.method == 'GET':
             self.permission_classes = (AllowAny, )
         return super().get_permissions()
+    
+    def get_queryset(self):
+        a = 1
+        return super(CinemaHallViewSet, self).get_queryset()
 
 
 class MovieSeanceViewSet(ModelViewSet):
     queryset = MovieSeance.objects.filter(show_end_date__gt=timezone.now())
     serializer_class = MovieSeanceSerializer
     permission_classes = [IsAdminUser]
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    # filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
+    filter_backends = [SearchFilter]
     ordering_fields = ['price', 'start_time_seance', ]
-    filter_class = MyTimeRangeAndHallFilter
+    # filter_class = MyTimeRangeAndHallFilter
     pagination_class = CustomPagination
     lookup_field = 'slug'
+    search_fields = ["movie_title"]
     
     def get_serializer_context(self):
         data_from_postman = self.request.data.pop('str_data', False)
@@ -83,7 +99,7 @@ class MovieSeanceViewSet(ModelViewSet):
     def get_queryset(self):
         dtn = timezone.now()
         td = timedelta(days=1)
-        show_day = self.kwargs.get('show_day')
+        show_day = self.kwargs.get('show_day', False)
 
         if show_day == 'today':
             return super().get_queryset().filter(show_start_date__lte=dtn, show_end_date__gt=dtn)
@@ -119,6 +135,12 @@ class TagDetailView(ListAPIView):
             return super(TagDetailView, self).get_queryset()
 
 
+class TagView(ListAPIView):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = [AllowAny]
+
+
 class FeedBackView(APIView):
     permission_classes = [AllowAny]
     serializer_class = ContactSerailizer
@@ -133,13 +155,10 @@ class FeedBackView(APIView):
             message = data.get('message')
             send_mail(f'От {name} | {subject}', message, from_email, ['dimakozhurin28@gmail.com'])
             return Response({"success": "Sent"})
+        return Response("Form is not valid!")
 
 
-class PostViewSet(ModelViewSet):
-    search_fields = ['movie_title']
-    filter_backends = (SearchFilter, )
+class LastFiveMoviesView(ListAPIView):
+    queryset = MovieSeance.objects.all().order_by('-id')[:5]
     serializer_class = MovieSeanceSerializer
-    queryset = MovieSeance.objects.all()
-    lookup_field = 'slug'
     permission_classes = [AllowAny]
-    pagination_class = CustomPagination

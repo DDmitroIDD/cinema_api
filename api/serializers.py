@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from taggit.models import Tag
 from taggit_serializer.serializers import TaggitSerializer, TagListSerializerField
 
 from api.q_sets import q_set
@@ -10,9 +11,9 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ('id', 'username', 'password', 'avatar', 'password_confirmation')
+        fields = ('id', 'username', 'password', 'avatar', 'password_confirmation', 'is_staff', )
         write_only_fields = ('password', )
-        read_only_fields = ('id',)
+        read_only_fields = ('id', 'is_staff', )
 
     def validate(self, data):
         if self.context['request'].user.is_anonymous:
@@ -39,18 +40,18 @@ class MovieSeanceSerializer(TaggitSerializer, serializers.ModelSerializer):
         model = MovieSeance
         fields = ('id', 'movie_title', 'show_hall', 'tag', 'image', 'slug',
                   'start_time_seance', 'end_time_seance',
-                  'show_start_date', 'show_end_date', 'price', 'free_seats')
+                  'show_start_date', 'show_end_date', 'price', 'free_seats', 'description')
         read_only_fields = ('id', 'free_seats', )
         lookup_field = 'slug'
         extra_kwargs = {
             'url': {'lookup_field': 'slug'}
         }
 
-    def create(self, validated_data):
-        validated_data['free_seats'] = CinemaHall.objects.get(id=validated_data['show_hall'].id).hall_size
-        validated_data['slug'] = '_'.join(validated_data['movie_title'].split())
-        movie = MovieSeance.objects.create(**validated_data)
-        return movie
+    # def create(self, validated_data):
+        # validated_data['free_seats'] = CinemaHall.objects.get(id=validated_data['show_hall'].id).hall_size
+        # validated_data['slug'] = '_'.join(validated_data['movie_title'].split())
+        # movie = MovieSeance.objects.create(**validated_data)
+        # return movie
 
     def validate(self, attrs):
         movies = False
@@ -139,3 +140,14 @@ class ContactSerailizer(serializers.Serializer):
     email = serializers.EmailField()
     subject = serializers.CharField()
     message = serializers.CharField()
+
+
+class TagSerializer(MovieSeanceSerializer):
+
+    class Meta:
+        model = Tag
+        fields = ("name", )
+        lookup_field = "name"
+        extra_kwargs = {
+            "url": {"lookup_field": "name"}
+        }
